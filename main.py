@@ -50,6 +50,7 @@ def go(config: DictConfig):
             )
 
         if "basic_cleaning" in active_steps:
+            # Clean data and load in W&B
             _ = mlflow.run(
                 os.path.join(hydra.utils.get_original_cwd(), "src", "basic_cleaning"),
                 "main",
@@ -58,22 +59,38 @@ def go(config: DictConfig):
                     "output_name": "clean_sample.csv",
                     "output_type": "clean_sample",
                     "output_description": "Data with outliers removed",
-                    "min_price": config['etl']['min_price'],
-                    "max_price": config['etl']['max_price']
+                    "min_price": config["etl"]["min_price"],
+                    "max_price": config["etl"]["max_price"]
                 },
             )
 
         if "data_check" in active_steps:
-            ##################
-            # Implement here #
-            ##################
-            pass
+            # Check data against some test cases
+            _ = mlflow.run(
+                os.path.join(hydra.utils.get_original_cwd(), "src", "data_check"),
+                "main",
+                parameters={
+                    "csv": "clean_sample.csv:latest",
+                    "ref": "clean_sample.csv:reference",
+                    "kl_threshold": config["data_check"]["kl_threshold"],
+                    "min_price": config["etl"]["min_price"],
+                    "max_price": config["etl"]["max_price"]
+                }
+            )
 
         if "data_split" in active_steps:
-            ##################
-            # Implement here #
-            ##################
-            pass
+            # Split data into train, test and validation sets
+            _ = mlflow.run(
+                f"{config['main']['components_repository']}/train_val_test_split",
+                entry_point="main",
+                version="6d24167ebee8421ad2934757fcfa8a521c2bf92b",
+                parameters={
+                    "input": "clean_sample.csv:latest",
+                    "test_size": config["modeling"]["test_size"],
+                    "random_seed": config["modeling"]["random_seed"],
+                    "stratify_by": config["modeling"]["stratify_by"],
+                },
+            )
 
         if "train_random_forest" in active_steps:
 
